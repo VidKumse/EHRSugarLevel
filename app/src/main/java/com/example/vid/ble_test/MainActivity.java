@@ -21,9 +21,9 @@ public class MainActivity extends AppCompatActivity {
     private BluetoothAdapter mBluetoothAdapter;
     private Handler mHandler;
     private boolean mScanning;
+    private boolean secondActivityStarted;
     private static final long SCAN_PERIOD = 3000;
     TextView textView1;
-
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -32,6 +32,7 @@ public class MainActivity extends AppCompatActivity {
         Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
 
+        secondActivityStarted = false;
         textView1 = (TextView) findViewById(R.id.textView1);
         mHandler = new Handler();
 
@@ -49,6 +50,12 @@ public class MainActivity extends AppCompatActivity {
             finish();
             return;
         }
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        secondActivityStarted = false;
     }
 
     @Override
@@ -98,10 +105,15 @@ public class MainActivity extends AppCompatActivity {
                             if (ime.equals("SensorTag")) {
                                 scanLeDevice(false);
                                 textView1.setText("Naprava je najdena: " + ime);
-                                Intent intent = new Intent(MainActivity.this, Obrazec.class);
-                                intent.putExtra("device", device);
-                                startActivity(intent);
-                                return;
+                                if (secondActivityStarted == false) {
+                                    secondActivityStarted = true;
+                                    Intent intent = new Intent(MainActivity.this, Obrazec.class);
+                                    intent.putExtra("device", device);
+                                    startActivity(intent);
+                                    return;
+                                } else {
+                                    return;
+                                }
                             }
                         }
                     });
