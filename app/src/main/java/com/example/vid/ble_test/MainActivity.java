@@ -76,7 +76,6 @@ public class MainActivity extends AppCompatActivity {
                     invalidateOptionsMenu();
                 }
             }, SCAN_PERIOD);
-
             mScanning = true;
             mBluetoothAdapter.startLeScan(mLeScanCallback);
         } else {
@@ -97,7 +96,12 @@ public class MainActivity extends AppCompatActivity {
                             String ime = device.getName().toString();
                             textView1.setText(ime);
                             if (ime.equals("SensorTag")) {
+                                scanLeDevice(false);
                                 textView1.setText("Naprava je najdena: " + ime);
+                                Intent intent = new Intent(MainActivity.this, Obrazec.class);
+                                intent.putExtra("device", device);
+                                startActivity(intent);
+                                return;
                             }
                         }
                     });

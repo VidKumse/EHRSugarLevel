@@ -1,20 +1,19 @@
 package com.example.vid.ble_test;
 
+import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
+import android.bluetooth.BluetoothManager;
+import android.content.Context;
 import android.content.Intent;
 import android.os.Bundle;
-import android.support.design.widget.FloatingActionButton;
-import android.support.design.widget.Snackbar;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.Toolbar;
-import android.view.View;
 import android.widget.TextView;
 
 public class Obrazec extends AppCompatActivity {
 
-    TextView t2;
-    BluetoothDevice myDevice;
-    String name;
+    TextView textView2;
+    BluetoothDevice device;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -23,30 +22,8 @@ public class Obrazec extends AppCompatActivity {
         Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
 
-        FloatingActionButton fab = (FloatingActionButton) findViewById(R.id.fab);
-        fab.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                Snackbar.make(view, "Replace with your own action", Snackbar.LENGTH_LONG)
-                        .setAction("Action", null).show();
-            }
-        });
-
-
-        t2 = (TextView) findViewById(R.id.t2);
-        String ind = "false";
-
-        myDevice = getIntent().getExtras().getParcelable("device");
-
-
-        name = myDevice.getAddress().toString(); //napaka
-        t2.setText(ind);
-
-
-
-
-
-
+        textView2 = (TextView) findViewById(R.id.textView2);
+        device = getIntent().getExtras().getParcelable("device");
+        textView2.setText("Ime naprave: " + device.getName());
     }
-
 }
