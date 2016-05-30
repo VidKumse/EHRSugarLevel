@@ -27,6 +27,7 @@ public class BLEService extends Service {
     private static final int STATE_CONNECTING = 1;
     private static final int STATE_CONNECTED = 2;
 
+    //Nastavimo filtre
     public final static String ACTION_GATT_CONNECTED =
             "com.example.bluetooth.le.ACTION_GATT_CONNECTED";
     public final static String ACTION_GATT_DISCONNECTED =
@@ -42,17 +43,22 @@ public class BLEService extends Service {
     public BLEService() {
     }
 
+    public class LocalBinder extends Binder {
+        BLEService getService() {
+            return BLEService.this;
+        }
+    }
+
+    //Ustvarimo objekt IBinder
+    private final IBinder mBinder = new LocalBinder();
+
     @Override
     public IBinder onBind(Intent intent) {
-        // TODO: Return the communication channel to the service.
-        //throw new UnsupportedOperationException("Not yet implemented");
         return mBinder;
     }
 
     public boolean onUnbind(Intent intent) {
-        // After using a given device, you should make sure that BluetoothGatt.close() is called
-        // such that resources are cleaned up properly.  In this particular example, close() is
-        // invoked when the UI is disconnected from the Service.
+        //Zapremo povezavo z GATT
         close();
         return super.onUnbind(intent);
     }
@@ -65,13 +71,8 @@ public class BLEService extends Service {
         mBluetoothGatt = null;
     }
 
-    private final IBinder mBinder = new LocalBinder();
 
-    public class LocalBinder extends Binder {
-        BLEService getService() {
-            return BLEService.this;
-        }
-    }
+    //Ta metoda samo preverja podporo BLE na telefonu
     public boolean initialize() {
         //Preverimo, če obstajata BluetoothManager in BluetoothAdapter -> zaradi verzije androida!
         if (mBluetoothManager == null) {
@@ -91,6 +92,7 @@ public class BLEService extends Service {
         return true;
     }
 
+    //Ta metoda izvede povezavo z GATT serverjem
     public boolean connect(final String address) {
         //Preverimo, če BluetoothAdapter ni inicializiran ali nima podanega naslova
         if (mBluetoothAdapter == null || address == null) {
@@ -177,6 +179,9 @@ public class BLEService extends Service {
         }
     };
 
+
+    //Obe BoradcastUpdate metodi, ki ju uporablja zgornji callback. Prva samo pošlje intent, druga pa še
+    //konkretne zajete podatke
     private void broadcastUpdate(final String action) {
         final Intent intent = new Intent(action);
         sendBroadcast(intent);

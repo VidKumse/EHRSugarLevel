@@ -1,8 +1,6 @@
 package com.example.vid.ble_test;
 
-import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
-import android.bluetooth.BluetoothManager;
 import android.content.BroadcastReceiver;
 import android.content.ComponentName;
 import android.content.Context;
@@ -14,7 +12,6 @@ import android.os.IBinder;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.Toolbar;
 import android.util.Log;
-import android.widget.SimpleExpandableListAdapter;
 import android.widget.TextView;
 
 public class Obrazec extends AppCompatActivity {
@@ -71,34 +68,34 @@ public class Obrazec extends AppCompatActivity {
 
         mDeviceAddress = device.getAddress();
 
-        //Kličemo service
+        //Kličemo BLEService
         Intent gattServiceIntent = new Intent(this, BLEService.class);
         bindService(gattServiceIntent, mServiceConnection, BIND_AUTO_CREATE);
     }
 
     @Override
     protected void onResume() {
+        //registerReciever metoda prejme podatke od BLEService.
         super.onResume();
         registerReceiver(mGattUpdateReceiver, makeGattUpdateIntentFilter());
-        if (mBluetoothLeService != null) {
-            final boolean result = mBluetoothLeService.connect(mDeviceAddress);
-            Log.d(TAG, "Connect request result=" + result);
-        }
     }
 
     @Override
     protected void onPause() {
         super.onPause();
+        //ugasne reciever
         unregisterReceiver(mGattUpdateReceiver);
     }
 
     @Override
     protected void onDestroy() {
         super.onDestroy();
+        //Ugasne BLEService
         unbindService(mServiceConnection);
         mBluetoothLeService = null;
     }
 
+    //Zgenerira filtre, ki jih podamo v registerReciever
     private static IntentFilter makeGattUpdateIntentFilter() {
         final IntentFilter intentFilter = new IntentFilter();
         intentFilter.addAction(BLEService.ACTION_GATT_CONNECTED);
