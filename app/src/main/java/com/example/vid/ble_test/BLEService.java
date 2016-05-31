@@ -6,6 +6,7 @@ import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothGatt;
 import android.bluetooth.BluetoothGattCallback;
 import android.bluetooth.BluetoothGattCharacteristic;
+import android.bluetooth.BluetoothGattService;
 import android.bluetooth.BluetoothManager;
 import android.bluetooth.BluetoothProfile;
 import android.content.Context;
@@ -13,6 +14,8 @@ import android.content.Intent;
 import android.os.Binder;
 import android.os.IBinder;
 import android.util.Log;
+
+import java.util.UUID;
 
 public class BLEService extends Service {
 
@@ -69,6 +72,14 @@ public class BLEService extends Service {
         }
         mBluetoothGatt.close();
         mBluetoothGatt = null;
+    }
+
+    public void readCharacteristic(BluetoothGattCharacteristic characteristic) {
+        if (mBluetoothAdapter == null || mBluetoothGatt == null) {
+            Log.w(TAG, "BluetoothAdapter not initialized");
+            return;
+        }
+        mBluetoothGatt.readCharacteristic(characteristic);
     }
 
 
@@ -158,6 +169,7 @@ public class BLEService extends Service {
         public void onServicesDiscovered(BluetoothGatt gatt, int status) {
             if (status == BluetoothGatt.GATT_SUCCESS) {
                 broadcastUpdate(ACTION_GATT_SERVICES_DISCOVERED);
+                getTemperature(gatt);
             } else {
                 Log.w(TAG, "onServicesDiscovered received: " + status);
             }
@@ -169,6 +181,7 @@ public class BLEService extends Service {
                                          int status) {
             if (status == BluetoothGatt.GATT_SUCCESS) {
                 broadcastUpdate(ACTION_DATA_AVAILABLE, characteristic);
+                System.out.println("dobi "+characteristic.toString());
             }
         }
 
@@ -176,6 +189,7 @@ public class BLEService extends Service {
         public void onCharacteristicChanged(BluetoothGatt gatt,
                                             BluetoothGattCharacteristic characteristic) {
             broadcastUpdate(ACTION_DATA_AVAILABLE, characteristic);
+            System.out.println("update");
         }
     };
 
@@ -201,6 +215,26 @@ public class BLEService extends Service {
         }
 
         sendBroadcast(intent);
+    }
+
+    public BluetoothGattService getServiceTemperature() {
+        if (mBluetoothGatt == null) return null;
+        UUID UUID_TEMPERATURE = UUID.fromString("F000AA01-0451-4000-B000-000000000000");
+        return mBluetoothGatt.getService(UUID_TEMPERATURE);
+    }
+
+    public void getTemperature(BluetoothGatt bluetoothGatt) {
+        UUID temperatureServiceUuid = UUID.fromString("f000aa10-0451-4000-b000-000000000000");
+        UUID temperatureConfigUuid = UUID.fromString("f000aa12-0451-4000-b000-000000000000");
+        UUID temperatureReadUuid = UUID.fromString("F000AA11-0451-4000-b000-000000000000");
+
+        BluetoothGattService temperatureService = bluetoothGatt.getService(temperatureServiceUuid);
+        BluetoothGattCharacteristic config = temperatureService.getCharacteristic(temperatureConfigUuid);
+        BluetoothGattCharacteristic temperatureRead = temperatureService.getCharacteristic(temperatureReadUuid);
+        config.setValue(new byte[]{1}); //NB: the config value is different for the Gyroscope
+        bluetoothGatt.writeCharacteristic(config);
+        System.out.println("Config: "+config.toString());
+        readCharacteristic(temperatureRead);
     }
 
 

@@ -49,7 +49,15 @@ public class Obrazec extends AppCompatActivity {
         @Override
         public void onReceive(Context context, Intent intent) {
             final String action = intent.getAction();
-            System.out.println("bbbbbbbb"+action);
+            //System.out.println("bbbbbbbb"+action);
+
+            if (BLEService.ACTION_GATT_SERVICES_DISCOVERED.equals(action)) {
+                //System.out.println("bbbbbbb sevices "+mBluetoothLeService.getServiceTemperature());
+                System.out.println("bbbbbbb sevices ");
+            } else if (BLEService.ACTION_DATA_AVAILABLE.equals(action)) {
+                System.out.println("bbbbbbb data "+intent.getStringExtra(BLEService.EXTRA_DATA));
+                textView2.setText(""+intent.getStringExtra(BLEService.EXTRA_DATA));
+            }
         }
     };
 
