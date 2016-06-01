@@ -74,6 +74,8 @@ public class BLEService extends Service {
         mBluetoothGatt = null;
     }
 
+    //Ta metoda prebere vrednost iz senzorja. Kliče se v metodi getTemperature, za njo pa se izvede callback,
+    //kjer imamo nadzor nad prejetim podatkom
     public void readCharacteristic(BluetoothGattCharacteristic characteristic) {
         if (mBluetoothAdapter == null || mBluetoothGatt == null) {
             Log.w(TAG, "BluetoothAdapter not initialized");
@@ -165,6 +167,7 @@ public class BLEService extends Service {
             }
         }
 
+        //Tu imao nadzor nad servici, ki tečejo na BLE napravi
         @Override
         public void onServicesDiscovered(BluetoothGatt gatt, int status) {
             if (status == BluetoothGatt.GATT_SUCCESS) {
@@ -175,6 +178,7 @@ public class BLEService extends Service {
             }
         }
 
+        //Tu imamo nadzor nad prejeto meritvijo iz senzorja
         @Override
         public void onCharacteristicRead(BluetoothGatt gatt,
                                          BluetoothGattCharacteristic characteristic,
@@ -185,6 +189,7 @@ public class BLEService extends Service {
             }
         }
 
+        //Tu imamo nadzor nad prejeto meritvijo, če se ta spremeni. Ali to rabimo?
         @Override
         public void onCharacteristicChanged(BluetoothGatt gatt,
                                             BluetoothGattCharacteristic characteristic) {
@@ -217,23 +222,30 @@ public class BLEService extends Service {
         sendBroadcast(intent);
     }
 
-    public BluetoothGattService getServiceTemperature() {
-        if (mBluetoothGatt == null) return null;
-        UUID UUID_TEMPERATURE = UUID.fromString("F000AA01-0451-4000-B000-000000000000");
-        return mBluetoothGatt.getService(UUID_TEMPERATURE);
-    }
-
+    //Glavna metoda, s pomočjo katere povemo BLE napravi, kater senzor bi radi brali
     public void getTemperature(BluetoothGatt bluetoothGatt) {
+        //Tu se definirajo naslovi iz datasheeta
         UUID temperatureServiceUuid = UUID.fromString("f000aa10-0451-4000-b000-000000000000");
         UUID temperatureConfigUuid = UUID.fromString("f000aa12-0451-4000-b000-000000000000");
         UUID temperatureReadUuid = UUID.fromString("F000AA11-0451-4000-b000-000000000000");
 
+        //Ustvarimo senzor na podlagi naslova iz datasheeta
         BluetoothGattService temperatureService = bluetoothGatt.getService(temperatureServiceUuid);
+
+        //Ustvarimo karakteristiko na podlagi naslova iz datasheeta. To je karakteristika, kamor
+        //bomo poslali 1
         BluetoothGattCharacteristic config = temperatureService.getCharacteristic(temperatureConfigUuid);
+
+        //Karakteristika, iz katere bo priletel podatek
         BluetoothGattCharacteristic temperatureRead = temperatureService.getCharacteristic(temperatureReadUuid);
+
+        //pošiljanje 1
         config.setValue(new byte[]{1}); //NB: the config value is different for the Gyroscope
         bluetoothGatt.writeCharacteristic(config);
+
         System.out.println("Config: "+config.toString());
+
+        //Takoj za pošiljanjem 1 kličemo metodo za branje karakteristike
         readCharacteristic(temperatureRead);
     }
 
