@@ -11,10 +11,14 @@ import android.bluetooth.BluetoothManager;
 import android.bluetooth.BluetoothProfile;
 import android.content.Context;
 import android.content.Intent;
+import android.graphics.Color;
 import android.os.Binder;
+import android.os.Handler;
 import android.os.IBinder;
 import android.util.Log;
 
+import java.util.Timer;
+import java.util.TimerTask;
 import java.util.UUID;
 
 public class BLEService extends Service {
@@ -25,6 +29,8 @@ public class BLEService extends Service {
     private String mBluetoothDeviceAddress;
     private BluetoothGatt mBluetoothGatt;
     private int mConnectionState = STATE_DISCONNECTED;
+    public BluetoothGattCharacteristic temperatureRead;
+    private Handler handler;
 
     private static final int STATE_DISCONNECTED = 0;
     private static final int STATE_CONNECTING = 1;
@@ -82,6 +88,14 @@ public class BLEService extends Service {
             return;
         }
         mBluetoothGatt.readCharacteristic(characteristic);
+    }
+
+    public void writeCharacteristic(BluetoothGattCharacteristic characteristic) {
+        if (mBluetoothAdapter == null || mBluetoothGatt == null) {
+            Log.w(TAG, "BluetoothAdapter not initialized");
+            return;
+        }
+        mBluetoothGatt.writeCharacteristic(characteristic);
     }
 
 
@@ -185,7 +199,8 @@ public class BLEService extends Service {
                                          int status) {
             if (status == BluetoothGatt.GATT_SUCCESS) {
                 broadcastUpdate(ACTION_DATA_AVAILABLE, characteristic);
-                System.out.println("dobi "+characteristic.toString());
+                System.out.println("dobi "+characteristic.getValue());
+
             }
         }
 
@@ -195,6 +210,23 @@ public class BLEService extends Service {
                                             BluetoothGattCharacteristic characteristic) {
             broadcastUpdate(ACTION_DATA_AVAILABLE, characteristic);
             System.out.println("update");
+        }
+
+        public void onCharacteristicWrite(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic, int status) {
+            //After writing the enable flag, next we read the initial value
+
+            new Timer().schedule(
+                    new TimerTask() {
+                        @Override
+                        public void run() {
+                            //System.out.println("zamik");
+                            readCharacteristic(temperatureRead);
+                        }
+                    },
+                    2000
+            );
+
+            System.out.println("Poslje se enable flag");
         }
     };
 
@@ -211,23 +243,28 @@ public class BLEService extends Service {
         final Intent intent = new Intent(action);
 
         //Ta del iz objekta characteristic pridobi HEX string in ga pošlje preko broadcasta
-        final byte[] data = characteristic.getValue();
+        /*final byte[] data = characteristic.getValue();
         if (data != null && data.length > 0) {
             final StringBuilder stringBuilder = new StringBuilder(data.length);
             for (byte byteChar : data)
                 stringBuilder.append(String.format("%02X ", byteChar));
             intent.putExtra(EXTRA_DATA, new String(data) + "\n" + stringBuilder.toString());
-        }
+        }*/
 
+
+
+        double x = extractAmbientTemperature(characteristic);
+        intent.putExtra(EXTRA_DATA, String.valueOf(x));
         sendBroadcast(intent);
     }
 
     //Glavna metoda, s pomočjo katere povemo BLE napravi, kater senzor bi radi brali
     public void getTemperature(BluetoothGatt bluetoothGatt) {
         //Tu se definirajo naslovi iz datasheeta
-        UUID temperatureServiceUuid = UUID.fromString("f000aa10-0451-4000-b000-000000000000");
-        UUID temperatureConfigUuid = UUID.fromString("f000aa12-0451-4000-b000-000000000000");
-        UUID temperatureReadUuid = UUID.fromString("F000AA11-0451-4000-b000-000000000000");
+        UUID temperatureServiceUuid = UUID.fromString("f000aa00-0451-4000-b000-000000000000");
+        UUID temperatureConfigUuid = UUID.fromString("f000aa02-0451-4000-b000-000000000000");
+        UUID temperatureReadUuid = UUID.fromString("F000AA01-0451-4000-b000-000000000000");
+        UUID tempperatureDelaySetUuid = UUID.fromString("F000AA03-0451-4000-b000-000000000000");
 
         //Ustvarimo senzor na podlagi naslova iz datasheeta
         BluetoothGattService temperatureService = bluetoothGatt.getService(temperatureServiceUuid);
@@ -237,17 +274,56 @@ public class BLEService extends Service {
         BluetoothGattCharacteristic config = temperatureService.getCharacteristic(temperatureConfigUuid);
 
         //Karakteristika, iz katere bo priletel podatek
-        BluetoothGattCharacteristic temperatureRead = temperatureService.getCharacteristic(temperatureReadUuid);
+        temperatureRead = temperatureService.getCharacteristic(temperatureReadUuid);
+
+        //Karakteristika za nastavitecv delaya
+        BluetoothGattCharacteristic tempperatureDelaySet = temperatureService.getCharacteristic(temperatureConfigUuid);
 
         //pošiljanje 1
-        config.setValue(new byte[]{1}); //NB: the config value is different for the Gyroscope
-        bluetoothGatt.writeCharacteristic(config);
+        config.setValue(new byte[]{0x01}); //NB: the config value is different for the Gyroscope
+        //tempperatureDelaySet.setValue(new byte[]{});
+        writeCharacteristic(config);
 
-        System.out.println("Config: "+config.toString());
+        System.out.println("Config: "+config.getValue());
+
+
+        /*new Timer().schedule(
+                new TimerTask() {
+                    @Override
+                    public void run() {
+                        //System.out.println("zamik");
+                        readCharacteristic(temperatureRead);
+                    }
+                },
+                1200
+        );*/
 
         //Takoj za pošiljanjem 1 kličemo metodo za branje karakteristike
-        readCharacteristic(temperatureRead);
+        //readCharacteristic(temperatureRead);
+
     }
 
+    private double extractAmbientTemperature(BluetoothGattCharacteristic c) {
+        int offset = 2;
+        return shortUnsignedAtOffset(c, offset) / 128.0;
+    }
+
+    private static Integer shortUnsignedAtOffset(BluetoothGattCharacteristic c, int offset) {
+        Integer lowerByte = c.getIntValue(c.FORMAT_UINT8, offset);
+        Integer upperByte = c.getIntValue(c.FORMAT_UINT8, offset + 1); // Note: interpret MSB as unsigned.
+
+        return (upperByte << 8) + lowerByte;
+    }
+
+    private double extractAcc(BluetoothGattCharacteristic c) {
+        Integer x = c.getIntValue(c.FORMAT_SINT8, 0);
+        Integer y = c.getIntValue(c.FORMAT_SINT8, 1);
+        Integer z = c.getIntValue(c.FORMAT_SINT8, 2) * -1;
+
+        double scaledX = x / 64.0;
+        double scaledY = y / 64.0;
+        double scaledZ = z / 64.0;
+        return scaledX;
+    }
 
 }

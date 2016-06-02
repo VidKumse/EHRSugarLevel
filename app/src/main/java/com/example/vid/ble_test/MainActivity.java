@@ -22,7 +22,7 @@ public class MainActivity extends AppCompatActivity {
     private Handler mHandler;
     private boolean mScanning;
     private boolean secondActivityStarted;
-    private static final long SCAN_PERIOD = 3000;
+    private static final long SCAN_PERIOD = 10000;
     TextView textView1;
 
     @Override
