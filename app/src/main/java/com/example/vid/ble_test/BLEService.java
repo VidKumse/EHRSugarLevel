@@ -240,10 +240,12 @@ public class BLEService extends Service {
 
 
         //Klic metode za pretvorbo prejetega podatka v temperaturo
-        double temperature = extractAmbientTemperature(characteristic);
+        double ambientTemperature = extractAmbientTemperature(characteristic);
+
+        double targetTemperature = extractTargetTemperature(characteristic, ambientTemperature);
 
         //S pomočjo broadcast intenta pošljemo podatek Activityu Obrazec.java
-        intent.putExtra(EXTRA_DATA, String.valueOf(temperature));
+        intent.putExtra(EXTRA_DATA, String.valueOf(targetTemperature));
         sendBroadcast(intent);
     }
 
@@ -279,6 +281,37 @@ public class BLEService extends Service {
     private static Integer shortUnsignedAtOffset(BluetoothGattCharacteristic c, int offset) {
         Integer lowerByte = c.getIntValue(c.FORMAT_UINT8, offset);
         Integer upperByte = c.getIntValue(c.FORMAT_UINT8, offset + 1);
+
+        return (upperByte << 8) + lowerByte;
+    }
+
+    private double extractTargetTemperature(BluetoothGattCharacteristic c, double ambient) {
+        Integer twoByteValue = shortSignedAtOffset(c, 0);
+
+        double Vobj2 = twoByteValue.doubleValue();
+        Vobj2 *= 0.00000015625;
+
+        double Tdie = ambient + 273.15;
+
+        double S0 = 5.593E-14;	// Calibration factor
+        double a1 = 1.75E-3;
+        double a2 = -1.678E-5;
+        double b0 = -2.94E-5;
+        double b1 = -5.7E-7;
+        double b2 = 4.63E-9;
+        double c2 = 13.4;
+        double Tref = 298.15;
+        double S = S0*(1+a1*(Tdie - Tref)+a2*Math.pow((Tdie - Tref),2));
+        double Vos = b0 + b1*(Tdie - Tref) + b2*Math.pow((Tdie - Tref),2);
+        double fObj = (Vobj2 - Vos) + c2*Math.pow((Vobj2 - Vos),2);
+        double tObj = Math.pow(Math.pow(Tdie,4) + (fObj/S),.25);
+
+        return tObj - 273.15;
+    }
+
+    private static Integer shortSignedAtOffset(BluetoothGattCharacteristic c, int offset) {
+        Integer lowerByte = c.getIntValue(c.FORMAT_UINT8, offset);
+        Integer upperByte = c.getIntValue(c.FORMAT_SINT8, offset + 1); // Note: interpret MSB as signed.
 
         return (upperByte << 8) + lowerByte;
     }

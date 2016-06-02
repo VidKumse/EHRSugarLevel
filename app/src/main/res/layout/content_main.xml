@@ -8,6 +8,7 @@
     android:paddingLeft="@dimen/activity_horizontal_margin"
     android:paddingRight="@dimen/activity_horizontal_margin"
     android:paddingTop="@dimen/activity_vertical_margin"
+    android:background="@color/white"
     app:layout_behavior="@string/appbar_scrolling_view_behavior"
     tools:context="com.example.vid.ble_test.MainActivity"
     tools:showIn="@layout/activity_main">
@@ -18,11 +19,18 @@
         android:text=""
         android:id="@+id/textView1"/>
 
+    <ImageView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:src="@drawable/ehr1"
+        />
+
     <Button android:id="@+id/gumb"
         android:layout_width="fill_parent"
         android:layout_height="wrap_content"
         android:layout_alignParentBottom="true"
+        android:onClick="click_scan"
         android:text="SCAN"
-        android:onClick="click_scan"/>
+        />
 
 </RelativeLayout>
