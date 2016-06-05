@@ -16,9 +16,7 @@ import android.os.IBinder;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.Toolbar;
 import android.util.Log;
-import android.view.MenuItem;
 import android.view.View;
-import android.view.Window;
 import android.widget.EditText;
 import android.widget.RadioButton;
 import android.widget.TextView;
@@ -54,7 +52,7 @@ public class Obrazec extends AppCompatActivity {
     String comment;
     String context;
 
-    //Senzorske spremenljivke
+    //Spremenljivke za senzor korakov
     private SensorManager mSensorManager;
     private Sensor mStepSensor;
     private TextView mTextView;
@@ -102,16 +100,15 @@ public class Obrazec extends AppCompatActivity {
         Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
 
+        //View elementi
         textView2 = (TextView) findViewById(R.id.textView2);
         device = getIntent().getExtras().getParcelable("device");
         textView2.setText("Ime naprave: " + device.getName());
-
-        mDeviceAddress = device.getAddress();
-
         vpis = (EditText) findViewById(R.id.vpis);
         comment_polje = (EditText) findViewById(R.id.comment);
         mTextView = (TextView) findViewById(R.id.text_step);
 
+        mDeviceAddress = device.getAddress();
         mSensorManager = (SensorManager) getSystemService(SENSOR_SERVICE);
         mStepSensor = mSensorManager.getDefaultSensor(Sensor.TYPE_STEP_COUNTER);
 
@@ -126,6 +123,7 @@ public class Obrazec extends AppCompatActivity {
         super.onResume();
         registerReceiver(mGattUpdateReceiver, makeGattUpdateIntentFilter());
 
+        //Vklop senzorja korakov
         mSensorManager.registerListener(mSensorEventListener, mStepSensor,
                 SensorManager.SENSOR_DELAY_NORMAL);
     }
@@ -158,41 +156,37 @@ public class Obrazec extends AppCompatActivity {
         return intentFilter;
     }
 
+    //Izvede se ob pritisku na gumb Pošlji. Pošlje podatke v ThinkEHR
     public void Send(View v) {
 
         t = (TextView)findViewById(R.id.t);
         sugar_level = vpis.getText().toString();
         comment = comment_polje.getText().toString();
 
-        //Time
+        //Spremenljivke za čas
         Calendar c = Calendar.getInstance();
-        int seconds = c.get(Calendar.SECOND);
         int minutes = c.get(Calendar.MINUTE);
         int hours = c.get(Calendar.HOUR_OF_DAY);
         int day = c.get(Calendar.DAY_OF_MONTH);
         int month = c.get(Calendar.MONTH);
         int year = c.get(Calendar.YEAR);
 
+        //Sestavimo format časa
         final String time = year+"-"+month+"-"+day+"T"+hours+":"+minutes+"Z";
-
-
-
 
         //2bbc32eb-ba55-43e6-bcd4-7e3ce9e4627e Ivan Cankar
         String patientIdEhr = "2bbc32eb-ba55-43e6-bcd4-7e3ce9e4627e";
 
-        Map<String,String> Params = new HashMap<String, String>();
-
         //Ustvarimo RequestQueue -> Vrsta, kamor bomo dodajali posamezne requeste.
         RequestQueue queue = Volley.newRequestQueue(this);
 
-        //URL
+        //Prvi URL, kamor se pošlje geslo in username. Ta vrne sessionID
         String url ="https://rest.ehrscape.com/rest/v1/session?username=ltfe&password=ltfe54321";
+
+        //Drugi URL, vključen je ID pacienta
         String url2 ="https://rest.ehrscape.com/rest/v1/composition?ehrId=" + patientIdEhr +
 
                 "&templateId=Blood_Glucose_LTFE&format=FLAT&committer=";
-
-        //String url2 = "http://echo.jsontest.com/key/value/one/two";
 
         /* Request tipa StringRequest.. izgleda tako:
         StringRequest(metoda, URL, Response.Listener, Response.ErrorListener)
@@ -200,17 +194,15 @@ public class Obrazec extends AppCompatActivity {
 
          */
 
-        //PRVI REQUEST
+        //PRVI REQUEST. V URL-ju pošljemo geslo in username, kot odgovor pa dobimo SessionID.
+        //Head in Body requesta sta prazna
         JsonObjectRequest jsObjRequest = new JsonObjectRequest
                 (Request.Method.POST, url, null, new Response.Listener<JSONObject>() {
                     @Override
                     public void onResponse(JSONObject response) {
 
                         //opstring se uporabi, ker v primeru napacnega keya vrne null string.
-
                         sessionId = response.optString("sessionId", null);
-                        t.setText("Identifikacija uspela!");
-
                     }
                 }, new Response.ErrorListener() {
                     @Override
@@ -222,6 +214,8 @@ public class Obrazec extends AppCompatActivity {
         //Dodamo request v queue
         queue.add(jsObjRequest);
 
+        //Zgeneriramo HashMap, kjer so vpisani naslovi do posameznih arhetipov in njihove konkkretne vrednosti za vpis
+        //Tole se bo vpisalo v body drugega requesta
         Map<String,String> params = new HashMap<String, String>();
         params.put("ctx/language","en");
         params.put("ctx/territory", "SI");
@@ -233,53 +227,37 @@ public class Obrazec extends AppCompatActivity {
         params.put("blood_glucose_test/blood_glucose_test_result:0/device:0/device_name","VPD 2in1 Smart");
         params.put("blood_glucose_test/blood_glucose_test_result:0/device:0/type", "PG101");
 
-        //DRUGI REQUEST
-
+        //DRUGI REQUEST. V glavi pošljemo sessionID, v body-ju pa podatke za vpis. Oboje je v formatu JSON
         JsonObjectRequest jsObjRequest2 = new JsonObjectRequest
                 (Request.Method.POST, url2, new JSONObject(params), new Response.Listener<JSONObject>() {
                     @Override
                     public void onResponse(JSONObject response) {
-
-                        //opstring se uporabi, ker v primeru napacnega keya vrne null string.
-
-
                         t.setText("Vpis je bil uspešno poslan!");
-
                     }
                 }, new Response.ErrorListener() {
                     @Override
                     public void onErrorResponse(VolleyError error) {
                         t.setText("Prišlo je do napake med prenosom podatkov!");
-                        //t.setText(sessionId);
                     }
                 }){
-
-
             @Override
             public Map<String, String> getHeaders() throws AuthFailureError {
+                //Glava (head)
                 HashMap<String, String> headers = new HashMap<String, String>();
                 headers.put("Content-Type", "application/json; charset=utf-8");
                 headers.put("Ehr-Session", sessionId);
-                //
-                ///Params = params;
                 return headers;
             }
         };
-
-        //Dodamo request v queue
-        //if(sessionId != "") {
         queue.add(jsObjRequest2);
-        //}
-
-
     }
 
 
     public void onRadioButtonClicked(View view) {
-        // Is the button now checked?
+        //Preverimo, če je gumb pritisnjen
         boolean checked = ((RadioButton) view).isChecked();
 
-        // Check which radio button was clicked
+        //Preverimo, kateri gumb je bil  pritisnjen
         switch(view.getId()) {
             case R.id.radio_predZajtrkom:
                 if (checked)
@@ -309,19 +287,20 @@ public class Obrazec extends AppCompatActivity {
                 if (checked)
                     context =  "at0.0.33";
                 break;
-
-
         }
     }
 
+    //Listener za senzor korakov
     private SensorEventListener mSensorEventListener = new SensorEventListener() {
+
         private float mStepOffset;
 
+        //Če se spremeni natančnost senzorja
         @Override
         public void onAccuracyChanged(Sensor sensor, int accuracy) {
-
         }
 
+        //Če se spremeni vrednost senzorja
         @Override
         public void onSensorChanged(SensorEvent event) {
             if (mStepOffset == 0) {
