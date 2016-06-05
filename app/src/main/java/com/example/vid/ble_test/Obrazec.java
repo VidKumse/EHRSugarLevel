@@ -7,12 +7,35 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.ServiceConnection;
+import android.hardware.Sensor;
+import android.hardware.SensorEvent;
+import android.hardware.SensorEventListener;
+import android.hardware.SensorManager;
 import android.os.Bundle;
 import android.os.IBinder;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.Toolbar;
 import android.util.Log;
+import android.view.MenuItem;
+import android.view.View;
+import android.view.Window;
+import android.widget.EditText;
+import android.widget.RadioButton;
 import android.widget.TextView;
+
+import com.android.volley.AuthFailureError;
+import com.android.volley.Request;
+import com.android.volley.RequestQueue;
+import com.android.volley.Response;
+import com.android.volley.VolleyError;
+import com.android.volley.toolbox.JsonObjectRequest;
+import com.android.volley.toolbox.Volley;
+
+import org.json.JSONObject;
+
+import java.util.Calendar;
+import java.util.HashMap;
+import java.util.Map;
 
 public class Obrazec extends AppCompatActivity {
 
@@ -22,6 +45,19 @@ public class Obrazec extends AppCompatActivity {
     private BLEService mBluetoothLeService;
     private final static String TAG = Obrazec.class.getSimpleName();
     private boolean mConnected = false;
+
+    TextView t;
+    EditText vpis;
+    EditText comment_polje;
+    String sessionId = "";
+    String sugar_level;
+    String comment;
+    String context;
+
+    //Senzorske spremenljivke
+    private SensorManager mSensorManager;
+    private Sensor mStepSensor;
+    private TextView mTextView;
 
 
     //metoda za kontrolo življenjskega cikla servisa
@@ -72,6 +108,13 @@ public class Obrazec extends AppCompatActivity {
 
         mDeviceAddress = device.getAddress();
 
+        vpis = (EditText) findViewById(R.id.vpis);
+        comment_polje = (EditText) findViewById(R.id.comment);
+        mTextView = (TextView) findViewById(R.id.text_step);
+
+        mSensorManager = (SensorManager) getSystemService(SENSOR_SERVICE);
+        mStepSensor = mSensorManager.getDefaultSensor(Sensor.TYPE_STEP_COUNTER);
+
         //Kličemo BLEService
         Intent gattServiceIntent = new Intent(this, BLEService.class);
         bindService(gattServiceIntent, mServiceConnection, BIND_AUTO_CREATE);
@@ -82,6 +125,9 @@ public class Obrazec extends AppCompatActivity {
         //registerReciever metoda prejme podatke od BLEService.
         super.onResume();
         registerReceiver(mGattUpdateReceiver, makeGattUpdateIntentFilter());
+
+        mSensorManager.registerListener(mSensorEventListener, mStepSensor,
+                SensorManager.SENSOR_DELAY_NORMAL);
     }
 
     @Override
@@ -89,6 +135,9 @@ public class Obrazec extends AppCompatActivity {
         super.onPause();
         //ugasne reciever
         unregisterReceiver(mGattUpdateReceiver);
+
+        //Izklop senzorja korakov
+        mSensorManager.unregisterListener(mSensorEventListener);
     }
 
     @Override
@@ -109,5 +158,177 @@ public class Obrazec extends AppCompatActivity {
         return intentFilter;
     }
 
+    public void Send(View v) {
+
+        t = (TextView)findViewById(R.id.t);
+        sugar_level = vpis.getText().toString();
+        comment = comment_polje.getText().toString();
+
+        //Time
+        Calendar c = Calendar.getInstance();
+        int seconds = c.get(Calendar.SECOND);
+        int minutes = c.get(Calendar.MINUTE);
+        int hours = c.get(Calendar.HOUR_OF_DAY);
+        int day = c.get(Calendar.DAY_OF_MONTH);
+        int month = c.get(Calendar.MONTH);
+        int year = c.get(Calendar.YEAR);
+
+        final String time = year+"-"+month+"-"+day+"T"+hours+":"+minutes+"Z";
+
+
+
+
+        //2bbc32eb-ba55-43e6-bcd4-7e3ce9e4627e Ivan Cankar
+        String patientIdEhr = "2bbc32eb-ba55-43e6-bcd4-7e3ce9e4627e";
+
+        Map<String,String> Params = new HashMap<String, String>();
+
+        //Ustvarimo RequestQueue -> Vrsta, kamor bomo dodajali posamezne requeste.
+        RequestQueue queue = Volley.newRequestQueue(this);
+
+        //URL
+        String url ="https://rest.ehrscape.com/rest/v1/session?username=ltfe&password=ltfe54321";
+        String url2 ="https://rest.ehrscape.com/rest/v1/composition?ehrId=" + patientIdEhr +
+
+                "&templateId=Blood_Glucose_LTFE&format=FLAT&committer=";
+
+        //String url2 = "http://echo.jsontest.com/key/value/one/two";
+
+        /* Request tipa StringRequest.. izgleda tako:
+        StringRequest(metoda, URL, Response.Listener, Response.ErrorListener)
+        Oba Listenerja override-amo, v njima določimo izvedbo akcije ob prejemu responsa
+
+         */
+
+        //PRVI REQUEST
+        JsonObjectRequest jsObjRequest = new JsonObjectRequest
+                (Request.Method.POST, url, null, new Response.Listener<JSONObject>() {
+                    @Override
+                    public void onResponse(JSONObject response) {
+
+                        //opstring se uporabi, ker v primeru napacnega keya vrne null string.
+
+                        sessionId = response.optString("sessionId", null);
+                        t.setText("Identifikacija uspela!");
+
+                    }
+                }, new Response.ErrorListener() {
+                    @Override
+                    public void onErrorResponse(VolleyError error) {
+                        t.setText("Prišlo je do napake med identifikacijo na strežniku!");
+                    }
+                });
+
+        //Dodamo request v queue
+        queue.add(jsObjRequest);
+
+        Map<String,String> params = new HashMap<String, String>();
+        params.put("ctx/language","en");
+        params.put("ctx/territory", "SI");
+        params.put("blood_glucose_test/blood_glucose_test_result:0/any_event:0/datetime_result_issued", time);
+        params.put("blood_glucose_test/blood_glucose_test_result:0/any_event:0/result_group:0/result:0/glucose_result|magnitude", sugar_level);
+        params.put("blood_glucose_test/blood_glucose_test_result:0/any_event:0/result_group:0/result:0/glucose_result|unit","mg/dl");
+        params.put("blood_glucose_test/blood_glucose_test_result:0/any_event:0/result_group:0/result:0/result_comment:0",comment);
+        params.put("blood_glucose_test/blood_glucose_test_result:0/any_event:0/result_group:0/result:0/result_context|code",context);
+        params.put("blood_glucose_test/blood_glucose_test_result:0/device:0/device_name","VPD 2in1 Smart");
+        params.put("blood_glucose_test/blood_glucose_test_result:0/device:0/type", "PG101");
+
+        //DRUGI REQUEST
+
+        JsonObjectRequest jsObjRequest2 = new JsonObjectRequest
+                (Request.Method.POST, url2, new JSONObject(params), new Response.Listener<JSONObject>() {
+                    @Override
+                    public void onResponse(JSONObject response) {
+
+                        //opstring se uporabi, ker v primeru napacnega keya vrne null string.
+
+
+                        t.setText("Vpis je bil uspešno poslan!");
+
+                    }
+                }, new Response.ErrorListener() {
+                    @Override
+                    public void onErrorResponse(VolleyError error) {
+                        t.setText("Prišlo je do napake med prenosom podatkov!");
+                        //t.setText(sessionId);
+                    }
+                }){
+
+
+            @Override
+            public Map<String, String> getHeaders() throws AuthFailureError {
+                HashMap<String, String> headers = new HashMap<String, String>();
+                headers.put("Content-Type", "application/json; charset=utf-8");
+                headers.put("Ehr-Session", sessionId);
+                //
+                ///Params = params;
+                return headers;
+            }
+        };
+
+        //Dodamo request v queue
+        //if(sessionId != "") {
+        queue.add(jsObjRequest2);
+        //}
+
+
+    }
+
+
+    public void onRadioButtonClicked(View view) {
+        // Is the button now checked?
+        boolean checked = ((RadioButton) view).isChecked();
+
+        // Check which radio button was clicked
+        switch(view.getId()) {
+            case R.id.radio_predZajtrkom:
+                if (checked)
+                    context =  "at0.0.27";
+                break;
+            case R.id.radio_poZajtrku:
+                if (checked)
+                    context =  "at0.0.28";
+                break;
+            case R.id.radio_predKosilom:
+                if (checked)
+                    context =  "at0.0.29";
+                break;
+            case R.id.radio_poKosilu:
+                if (checked)
+                    context =  "at0.0.30";
+                break;
+            case R.id.radio_predVecerjo:
+                if (checked)
+                    context =  "at0.0.31";
+                break;
+            case R.id.radio_poVecerji:
+                if (checked)
+                    context =  "at0.0.32";
+                break;
+            case R.id.radio_predSpanjem:
+                if (checked)
+                    context =  "at0.0.33";
+                break;
+
+
+        }
+    }
+
+    private SensorEventListener mSensorEventListener = new SensorEventListener() {
+        private float mStepOffset;
+
+        @Override
+        public void onAccuracyChanged(Sensor sensor, int accuracy) {
+
+        }
+
+        @Override
+        public void onSensorChanged(SensorEvent event) {
+            if (mStepOffset == 0) {
+                mStepOffset = event.values[0];
+            }
+            mTextView.setText("Prehodili ste že "+Float.toString(event.values[0] - mStepOffset)+" korakov. Čestitke!");
+        }
+    };
 
 }
