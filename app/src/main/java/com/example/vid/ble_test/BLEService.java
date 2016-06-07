@@ -241,11 +241,14 @@ public class BLEService extends Service {
 
         //Klic metode za pretvorbo prejetega podatka v temperaturo
         double ambientTemperature = extractAmbientTemperature(characteristic);
-
         double targetTemperature = extractTargetTemperature(characteristic, ambientTemperature);
 
+        //Zaokroževanje temperatur
+        int ambientTemperatureINT = (int) Math.round(ambientTemperature);
+        int targetTemperatureINT = (int) Math.round(targetTemperature);
+
         //S pomočjo broadcast intenta pošljemo podatek Activityu Obrazec.java
-        intent.putExtra(EXTRA_DATA, String.valueOf(targetTemperature));
+        intent.putExtra(EXTRA_DATA, String.valueOf(ambientTemperatureINT));
         sendBroadcast(intent);
     }
 

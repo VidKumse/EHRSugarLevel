@@ -86,7 +86,7 @@ public class Obrazec extends AppCompatActivity {
 
             if (BLEService.ACTION_DATA_AVAILABLE.equals(action)) {
                 //Izpis prejete meritve iz senzorja. Meritev je potrebno še razbrati
-                textView2.setText(""+intent.getStringExtra(BLEService.EXTRA_DATA));
+                textView2.setText("Temperatura je: "+intent.getStringExtra(BLEService.EXTRA_DATA)+"°C");
             }
         }
     };
@@ -306,7 +306,9 @@ public class Obrazec extends AppCompatActivity {
             if (mStepOffset == 0) {
                 mStepOffset = event.values[0];
             }
-            mTextView.setText("Prehodili ste že "+Float.toString(event.values[0] - mStepOffset)+" korakov. Čestitke!");
+            float steps = event.values[0]-mStepOffset;
+            int stepsINT = Math.round(steps);
+            mTextView.setText("Število prehojenih korakov: "+Integer.toString(stepsINT));
         }
     };
 
